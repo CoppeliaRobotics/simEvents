@@ -22,71 +22,159 @@ using std::runtime_error;
 using json = jsoncons::json;
 
 
+struct Condition
+{
+    virtual ~Condition() {}
+    virtual bool matches(const sim::EventInfo &info, const json &data) const = 0;
+};
+
+struct AndCondition : public Condition
+{
+    AndCondition(const vector<Condition*> &conditions_)
+        : conditions(conditions_)
+    {
+    }
+
+    bool matches(const sim::EventInfo &info, const json &data) const override
+    {
+        for(const auto condition : conditions)
+            if(!condition->matches(info, data))
+                return false;
+        return true;
+    }
+
+private:
+    const vector<Condition*> conditions;
+};
+
+struct OrCondition : public Condition
+{
+    OrCondition(const vector<Condition*> &conditions_)
+        : conditions(conditions_)
+    {
+    }
+
+    bool matches(const sim::EventInfo &info, const json &data) const override
+    {
+        for(const auto condition : conditions)
+            if(condition->matches(info, data))
+                return true;
+        return false;
+    }
+
+private:
+    const vector<Condition*> conditions;
+};
+
+struct NotCondition : public Condition
+{
+    NotCondition(const Condition *c_)
+        : c(c_)
+    {
+    }
+
+    bool matches(const sim::EventInfo &info, const json &data) const override
+    {
+        return !c->matches(info, data);
+    }
+
+private:
+    const Condition *c;
+};
+
+struct EventTypeCondition : public Condition
+{
+    EventTypeCondition(const string &eventType_)
+        : eventType(eventType_)
+    {
+    }
+
+    bool matches(const sim::EventInfo &info, const json &data) const override
+    {
+        return info.event == eventType;
+    }
+
+private:
+    const string eventType;
+};
+
+struct HandleCondition : public Condition
+{
+    HandleCondition(const int handle_)
+        : handle(handle_)
+    {
+    }
+
+    bool matches(const sim::EventInfo &info, const json &data) const override
+    {
+        return info.handle == handle;
+    }
+
+private:
+    const int handle;
+};
+
+struct UIDCondition : public Condition
+{
+    UIDCondition(const int uid_)
+        : uid(uid_)
+    {
+    }
+
+    bool matches(const sim::EventInfo &info, const json &data) const override
+    {
+        return info.uid == uid;
+    }
+
+private:
+    const int uid;
+};
+
+struct EventDataCondition : public Condition
+{
+    EventDataCondition(const string &fieldName_)
+        : fieldName(fieldName_)
+    {
+    }
+
+    EventDataCondition(const string &fieldName_, const json &fieldValue_)
+        : fieldName(fieldName_), fieldValue(fieldValue_)
+    {
+    }
+
+    bool matches(const sim::EventInfo &info, const json &data) const override
+    {
+        if(!data.contains(fieldName))
+            return false;
+
+        if(!fieldValue.has_value())
+            return true;
+
+        return data[fieldName] == fieldValue.value();
+    }
+
+private:
+    const string fieldName;
+    const optional<json> fieldValue;
+};
+
 struct Probe
 {
-    Probe(int scriptID, const probe_opts &opts)
+    Probe(int scriptID, const string &callback)
     {
         this->scriptID = scriptID;
-        this->callback = opts.callback.value();
-        if(opts.eventTypes)
-        {
-            this->eventTypes.emplace();
-            for(const string &eventType : opts.eventTypes.value())
-                this->eventTypes.value()[eventType] = true;
-        }
-        if(opts.handles)
-        {
-            this->handles.emplace();
-            for(const int &handle : opts.handles.value())
-                this->handles.value()[handle] = true;
-        }
-        if(opts.properties)
-        {
-            this->properties.emplace();
-            for(const string &property : opts.properties.value())
-                this->properties.value()[property] = true;
-        }
+        this->callback = callback;
+    }
+
+    void setCondition(Condition *c)
+    {
+        this->condition = c;
     }
 
     bool matches(const sim::EventInfo &info, const json &data)
     {
-        if(eventTypes.has_value())
-        {
-            try
-            {
-                if(eventTypes.value().at(info.event) == false)
-                    return false;
-            }
-            catch(const std::out_of_range& ex)
-            {
-                return false;
-            }
-        }
-
-        if(handles.has_value())
-        {
-            try
-            {
-                if(handles.value().at(info.handle) == false)
-                    return false;
-            }
-            catch(const std::out_of_range& ex)
-            {
-                return false;
-            }
-        }
-
-        if(properties.has_value())
-        {
-            for(const auto &p : properties.value())
-            {
-                if(data.contains(p.first))
-                    return true;
-            }
-            return false;
-        }
-
-        return true;
+        if(!condition) return false;
+        return condition->matches(info, data);
     }
 
     void dispatch(const sim::EventInfo &info, const json &data)
@@ -105,10 +193,8 @@ struct Probe
 
 private:
     string callback;
-    int scriptID;
-    optional<map<string, bool>> eventTypes;
-    optional<map<int, bool>> handles;
-    optional<map<string, bool>> properties;
+    int scriptID {-1};
+    Condition *condition {nullptr};
 };
 
 class Plugin : public sim::Plugin
@@ -125,31 +211,92 @@ public:
 
     void onScriptStateAboutToBeDestroyed(int scriptHandle, long long scriptUid) override
     {
-        for(auto c : handles.find(scriptHandle))
-            delete handles.remove(c);
+        for(auto probe : probeHandles.find(scriptHandle))
+            delete probeHandles.remove(probe);
+        for(auto condition : conditionHandles.find(scriptHandle))
+            delete conditionHandles.remove(condition);
     }
 
     void onEvent(const sim::EventInfo &info, const json &data) override
     {
         int sceneID = sim::getInt32Param(sim_intparam_scene_unique_id);;
-        for(const auto &probe : handles.findByScene(sceneID))
+        for(const auto &probe : probeHandles.findByScene(sceneID))
             probe->onEvent(info, data);
     }
 
     void addProbe(addProbe_in *in, addProbe_out *out)
     {
-        auto probe = new Probe(in->_.scriptID, in->opts);
-        out->probeHandle = handles.add(probe, in->_.scriptID);
+        auto probe = new Probe(in->_.scriptID, in->callback);
+        out->probeHandle = probeHandles.add(probe, in->_.scriptID);
     }
 
     void removeProbe(removeProbe_in *in, removeProbe_out *out)
     {
-        auto probe = handles.get(in->probeHandle);
-        delete handles.remove(probe);
+        auto probe = probeHandles.get(in->probeHandle);
+        delete probeHandles.remove(probe);
+    }
+
+    void setProbeCondition(setProbeCondition_in *in, setProbeCondition_out *out)
+    {
+        auto probe = probeHandles.get(in->probeHandle);
+        auto condition = conditionHandles.get(in->conditionHandle);
+        probe->setCondition(condition);
+    }
+
+    void addAndCondition(addAndCondition_in *in, addAndCondition_out *out)
+    {
+        vector<Condition*> conditions;
+        for(const auto &conditionHandle : in->conditionHandles)
+            conditions.push_back(conditionHandles.get(conditionHandle));
+        auto condition = new AndCondition(conditions);
+        out->conditionHandle = conditionHandles.add(condition, in->_.scriptID);
+    }
+
+    void addOrCondition(addOrCondition_in *in, addOrCondition_out *out)
+    {
+        vector<Condition*> conditions;
+        for(const auto &conditionHandle : in->conditionHandles)
+            conditions.push_back(conditionHandles.get(conditionHandle));
+        auto condition = new OrCondition(conditions);
+        out->conditionHandle = conditionHandles.add(condition, in->_.scriptID);
+    }
+
+    void addNotCondition(addNotCondition_in *in, addNotCondition_out *out)
+    {
+        auto condition1 = conditionHandles.get(in->conditionHandle);
+        auto condition = new NotCondition(condition1);
+        out->conditionHandle = conditionHandles.add(condition, in->_.scriptID);
+    }
+
+    void addEventTypeCondition(addEventTypeCondition_in *in, addEventTypeCondition_out *out)
+    {
+        auto condition = new EventTypeCondition(in->eventType);
+        out->conditionHandle = conditionHandles.add(condition, in->_.scriptID);
+    }
+
+    void addHandleCondition(addHandleCondition_in *in, addHandleCondition_out *out)
+    {
+        auto condition = new HandleCondition(in->handle);
+        out->conditionHandle = conditionHandles.add(condition, in->_.scriptID);
+    }
+
+    void addUIDCondition(addUIDCondition_in *in, addUIDCondition_out *out)
+    {
+        auto condition = new UIDCondition(in->uid);
+        out->conditionHandle = conditionHandles.add(condition, in->_.scriptID);
+    }
+
+    void addEventDataCondition(addEventDataCondition_in *in, addEventDataCondition_out *out)
+    {
+        auto condition = in->fieldValue.has_value()
+            ? new EventDataCondition(in->fieldName, in->fieldValue)
+            : new EventDataCondition(in->fieldName);
+        out->conditionHandle = conditionHandles.add(condition, in->_.scriptID);
     }
 
 private:
-    sim::Handles<Probe*> handles{"simEvents.Probe"};
+    sim::Handles<Probe*> probeHandles{"simEvents.Probe"};
+    sim::Handles<Condition*> conditionHandles{"simEvents.Condition"};
 };
 
 SIM_PLUGIN(Plugin)

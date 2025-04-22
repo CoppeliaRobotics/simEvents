@@ -6,9 +6,7 @@
     <command name="addProbe">
         <description>Add a event probe.</description>
         <params>
-            <param name="opts" type="probe_opts" default="{}">
-                <description>Options. see <struct-ref name="probe_opts"/></description>
-            </param>
+            <param name="callback" type="string" />
         </params>
         <return>
             <param name="probeHandle" type="string" />
@@ -19,6 +17,77 @@
         <params>
             <param name="probeHandle" type="string" />
         </params>
+    </command>
+    <command name="setProbeCondition">
+        <description>Set the condition for an event probe to call the callback.</description>
+        <params>
+            <param name="probeHandle" type="string" />
+            <param name="conditionHandle" type="string" />
+        </params>
+    </command>
+    <command name="addAndCondition">
+        <description>Add a "AND" condition.</description>
+        <params>
+            <param name="conditionHandles" type="table" item-type="string" />
+        </params>
+        <return>
+            <param name="conditionHandle" type="string" />
+        </return>
+    </command>
+    <command name="addOrCondition">
+        <description>Add a "OR" condition.</description>
+        <params>
+            <param name="conditionHandles" type="table" item-type="string" />
+        </params>
+        <return>
+            <param name="conditionHandle" type="string" />
+        </return>
+    </command>
+    <command name="addNotCondition">
+        <description>Add a "NOT" condition.</description>
+        <params>
+            <param name="conditionHandle" type="string" />
+        </params>
+        <return>
+            <param name="conditionHandle" type="string" />
+        </return>
+    </command>
+    <command name="addEventTypeCondition">
+        <description>Add a condition on the event type.</description>
+        <params>
+            <param name="eventType" type="string" />
+        </params>
+        <return>
+            <param name="conditionHandle" type="string" />
+        </return>
+    </command>
+    <command name="addHandleCondition">
+        <description>Add a condition on the handle.</description>
+        <params>
+            <param name="handle" type="int" />
+        </params>
+        <return>
+            <param name="conditionHandle" type="string" />
+        </return>
+    </command>
+    <command name="addUIDCondition">
+        <description>Add a condition on the uid field.</description>
+        <params>
+            <param name="uid" type="long" />
+        </params>
+        <return>
+            <param name="conditionHandle" type="string" />
+        </return>
+    </command>
+    <command name="addEventDataCondition">
+        <description>Add a condition on the a field of the event data.</description>
+        <params>
+            <param name="fieldName" type="string" />
+            <param name="fieldValue" type="string" nullable="true" default="nil" />
+        </params>
+        <return>
+            <param name="conditionHandle" type="string" />
+        </return>
     </command>
     <struct name="probe_opts">
         <param name="callback" type="string" nullable="true">

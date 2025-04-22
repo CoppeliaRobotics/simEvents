@@ -8,21 +8,21 @@ Usage:
 sim = require 'sim'
 simEvents = require 'simEvents'
 
-function dummyCollapsedChange(data)
-    print('dummyCollapsedChange', data.collapsed)
+function callback(data)
+    print('callback', data)
 end
 
 function sysCall_init()
-    dummy = sim.getObject '/dummy'
-
-    probeHandle = simEvents.addProbe {
-        callback = 'dummyCollapsedChange',
-        handles = {dummy},
-        eventTypes = {'objectChanged'},
-        properties = {'collapsed'},
-    }
-
-    -- event probe can be removed later with simEvents.removeProbe(probeHandle)
+    dummy = sim.getObject('/dummy')
+    probeHandle = simEvents.addProbe('callback')
+    simEvents.setProbeCondition(probeHandle, simEvents.addAndCondition {
+        simEvents.addEventTypeCondition('objectChanged'),
+        simEvents.addHandleCondition(dummy),
+        simEvents.addOrCondition {
+            simEvents.addEventDataCondition('collapsed'),
+            simEvents.addEventDataCondition('selected')
+        },
+    })
 end
 ```
 
