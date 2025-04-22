@@ -142,6 +142,12 @@ public:
         out->probeHandle = handles.add(probe, in->_.scriptID);
     }
 
+    void removeProbe(removeProbe_in *in, removeProbe_out *out)
+    {
+        auto probe = handles.get(in->probeHandle);
+        delete handles.remove(probe);
+    }
+
 private:
     sim::Handles<Probe*> handles{"simEvents.Probe"};
 };
