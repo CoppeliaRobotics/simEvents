@@ -1,5 +1,31 @@
 # Events plugin for CoppeliaSim
 
+A plugin to filter events.
+
+Usage:
+
+```lua
+sim = require 'sim'
+simEvents = require 'simEvents'
+
+function dummyCollapsedChange(data)
+    print('dummyCollapsedChange', data.collapsed)
+end
+
+function sysCall_init()
+    dummy = sim.getObject '/dummy'
+
+    probeHandle = simEvents.addProbe {
+        callback = 'dummyCollapsedChange',
+        handles = {dummy},
+        eventTypes = {'objectChanged'},
+        properties = {'collapsed'},
+    }
+
+    -- event probe can be removed later with simEvents.removeProbe(probeHandle)
+end
+```
+
 ### Compiling
 
 1. Install required packages for simStubsGen: see simStubsGen's [README](https://github.com/CoppeliaRobotics/include/blob/master/simStubsGen/README.md)
