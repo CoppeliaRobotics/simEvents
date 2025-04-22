@@ -19,6 +19,9 @@ using std::map;
 using std::optional;
 using std::runtime_error;
 
+using json = jsoncons::json;
+
+
 struct Probe
 {
     Probe(int scriptID, const probe_opts &opts)
@@ -45,7 +48,7 @@ struct Probe
         }
     }
 
-    bool matches(const sim::EventInfo &info, const jsoncons::json &data)
+    bool matches(const sim::EventInfo &info, const json &data)
     {
         if(eventTypes.has_value())
         {
@@ -86,18 +89,15 @@ struct Probe
         return true;
     }
 
-    void dispatch(const sim::EventInfo &info, const jsoncons::json &data)
+    void dispatch(const sim::EventInfo &info, const json &data)
     {
-        std::vector<uint8_t> cbor_bytes;
-        jsoncons::cbor::encode_cbor(data, cbor_bytes);
         int stack = sim::createStack();
-        std::string cbor_string(cbor_bytes.begin(), cbor_bytes.end());
-        sim::pushStringOntoStack(stack, cbor_string);
+        sim::pushValueOntoStack(stack, data);
         sim::callScriptFunctionEx(scriptID, callback.c_str(), stack);
         sim::releaseStack(stack);
     }
 
-    void onEvent(const sim::EventInfo &info, const jsoncons::json &data)
+    void onEvent(const sim::EventInfo &info, const json &data)
     {
         if(matches(info, data))
             dispatch(info, data);
@@ -129,7 +129,7 @@ public:
             delete handles.remove(c);
     }
 
-    void onEvent(const sim::EventInfo &info, const jsoncons::json &data) override
+    void onEvent(const sim::EventInfo &info, const json &data) override
     {
         int sceneID = sim::getInt32Param(sim_intparam_scene_unique_id);;
         for(const auto &probe : handles.findByScene(sceneID))
