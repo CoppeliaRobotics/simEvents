@@ -186,7 +186,13 @@ struct Probe
     void dispatch(const sim::EventInfo &info, const json &data)
     {
         int stack = sim::createStack();
-        sim::pushValueOntoStack(stack, data);
+        json hdr = json::object();
+        hdr["event"] = info.event;
+        hdr["seq"] = info.seq;
+        hdr["uid"] = info.uid;
+        hdr["handle"] = info.handle;
+        hdr["data"] = data;
+        sim::pushValueOntoStack(stack, hdr);
         sim::callScriptFunctionEx(scriptID, callback.c_str(), stack);
         sim::releaseStack(stack);
     }
