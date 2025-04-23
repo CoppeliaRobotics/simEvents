@@ -16,10 +16,10 @@ function sysCall_init()
     dummy = sim.getObject('/dummy')
     probeHandle = simEvents.addProbe('callback', simEvents.addAndCondition{
         simEvents.addEventTypeCondition('objectChanged'),
-        simEvents.addHandleCondition(dummy),
-        simEvents.addOrCondition {
-            simEvents.addEventDataCondition('collapsed'),
-            simEvents.addEventDataCondition('selected')
+        simEvents.addHandlesCondition{dummy},
+        simEvents.addOrCondition{
+            simEvents.addEventDataCondition('collapsed'), -- filter on field presence
+            simEvents.addEventDataCondition('selected', true) -- filter on value
         },
     })
 end

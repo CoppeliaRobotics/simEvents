@@ -62,19 +62,19 @@
             <param name="conditionHandle" type="string" />
         </return>
     </command>
-    <command name="addHandleCondition">
+    <command name="addHandlesCondition">
         <description>Add a condition on the handle.</description>
         <params>
-            <param name="handle" type="int" />
+            <param name="handles" type="table" item-type="int" />
         </params>
         <return>
             <param name="conditionHandle" type="string" />
         </return>
     </command>
-    <command name="addUIDCondition">
+    <command name="addUIDsCondition">
         <description>Add a condition on the uid field.</description>
         <params>
-            <param name="uid" type="long" />
+            <param name="uids" type="table" item-type="long" />
         </params>
         <return>
             <param name="conditionHandle" type="string" />

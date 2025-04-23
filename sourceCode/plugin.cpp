@@ -98,36 +98,42 @@ private:
     const string eventType;
 };
 
-struct HandleCondition : public Condition
+struct HandlesCondition : public Condition
 {
-    HandleCondition(const int handle_)
-        : handle(handle_)
+    HandlesCondition(const vector<int> &handles_)
+        : handles(handles_)
     {
     }
 
     bool matches(const sim::EventInfo &info, const json &data) const override
     {
-        return info.handle == handle;
+        for(int handle : handles)
+            if(info.handle == handle)
+                return true;
+        return false;
     }
 
 private:
-    const int handle;
+    const vector<int> handles;
 };
 
-struct UIDCondition : public Condition
+struct UIDsCondition : public Condition
 {
-    UIDCondition(const int uid_)
-        : uid(uid_)
+    UIDsCondition(const vector<long long> &uids_)
+        : uids(uids_)
     {
     }
 
     bool matches(const sim::EventInfo &info, const json &data) const override
     {
-        return info.uid == uid;
+        for(long long uid : uids)
+            if(info.uid == uid)
+                return true;
+        return false;
     }
 
 private:
-    const int uid;
+    const vector<long long> uids;
 };
 
 struct EventDataCondition : public Condition
@@ -276,15 +282,15 @@ public:
         out->conditionHandle = conditionHandles.add(condition, in->_.scriptID);
     }
 
-    void addHandleCondition(addHandleCondition_in *in, addHandleCondition_out *out)
+    void addHandlesCondition(addHandlesCondition_in *in, addHandlesCondition_out *out)
     {
-        auto condition = new HandleCondition(in->handle);
+        auto condition = new HandlesCondition(in->handles);
         out->conditionHandle = conditionHandles.add(condition, in->_.scriptID);
     }
 
-    void addUIDCondition(addUIDCondition_in *in, addUIDCondition_out *out)
+    void addUIDsCondition(addUIDsCondition_in *in, addUIDsCondition_out *out)
     {
-        auto condition = new UIDCondition(in->uid);
+        auto condition = new UIDsCondition(in->uids);
         out->conditionHandle = conditionHandles.add(condition, in->_.scriptID);
     }
 
