@@ -227,6 +227,8 @@ public:
     void addProbe(addProbe_in *in, addProbe_out *out)
     {
         auto probe = new Probe(in->_.scriptID, in->callback);
+        if(in->conditionHandle.has_value())
+            probe->setCondition(conditionHandles.get(in->conditionHandle.value()));
         out->probeHandle = probeHandles.add(probe, in->_.scriptID);
     }
 

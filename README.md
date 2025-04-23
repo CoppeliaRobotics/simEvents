@@ -14,8 +14,7 @@ end
 
 function sysCall_init()
     dummy = sim.getObject('/dummy')
-    probeHandle = simEvents.addProbe('callback')
-    simEvents.setProbeCondition(probeHandle, simEvents.addAndCondition {
+    probeHandle = simEvents.addProbe('callback', simEvents.addAndCondition{
         simEvents.addEventTypeCondition('objectChanged'),
         simEvents.addHandleCondition(dummy),
         simEvents.addOrCondition {
