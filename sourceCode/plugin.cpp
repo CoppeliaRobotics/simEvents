@@ -26,6 +26,17 @@ struct Condition
 {
     virtual ~Condition() {}
     virtual bool matches(const sim::EventInfo &info, const json &data) const = 0;
+
+    static Condition * parse(const json &expr);
+
+private:
+    static vector<Condition*> parse(const json &expr, int start, int end = -1)
+    {
+        if(end == -1) end = expr.size();
+        vector<Condition*> result;
+        for(int i = start; i < end; i++) result.push_back(parse(expr[i]));
+        return result;
+    }
 };
 
 struct AndCondition : public Condition
@@ -33,6 +44,12 @@ struct AndCondition : public Condition
     AndCondition(const vector<Condition*> &conditions_)
         : conditions(conditions_)
     {
+    }
+
+    virtual ~AndCondition()
+    {
+        for(const auto condition : conditions)
+            delete condition;
     }
 
     bool matches(const sim::EventInfo &info, const json &data) const override
@@ -54,6 +71,12 @@ struct OrCondition : public Condition
     {
     }
 
+    virtual ~OrCondition()
+    {
+        for(const auto condition : conditions)
+            delete condition;
+    }
+
     bool matches(const sim::EventInfo &info, const json &data) const override
     {
         for(const auto condition : conditions)
@@ -68,18 +91,23 @@ private:
 
 struct NotCondition : public Condition
 {
-    NotCondition(const Condition *c_)
-        : c(c_)
+    NotCondition(const Condition *condition_)
+        : condition(condition_)
     {
+    }
+
+    virtual ~NotCondition()
+    {
+        delete condition;
     }
 
     bool matches(const sim::EventInfo &info, const json &data) const override
     {
-        return !c->matches(info, data);
+        return !condition->matches(info, data);
     }
 
 private:
-    const Condition *c;
+    const Condition *condition;
 };
 
 struct EventTypeCondition : public Condition
@@ -164,49 +192,126 @@ private:
     const optional<json> fieldValue;
 };
 
+Condition * Condition::parse(const json &expr)
+{
+    if(!expr.is_array() || expr.size() < 1 || !expr[0].is_string())
+        throw std::runtime_error("invalid condition");
+
+    string type = expr[0].as<string>();
+
+    if(type == "and")
+    {
+        if(expr.size() < 2)
+            throw std::runtime_error("\"and\" requires one or more arguments");
+        return new AndCondition(parse(expr, 1));
+    }
+    else if(type == "or")
+    {
+        if(expr.size() < 2)
+            throw std::runtime_error("\"or\" requires one or more arguments");
+        return new OrCondition(parse(expr, 1));
+    }
+    else if(type == "not")
+    {
+        if(expr.size() != 2)
+            throw std::runtime_error("\"not\" requires exactly one argument");
+        return new NotCondition(parse(expr[1]));
+    }
+    else if(type == "event")
+    {
+        if(expr.size() < 2)
+            throw std::runtime_error("\"event\" requires exactly one argument");
+        if(!expr[1].is_string())
+            throw std::runtime_error("\"event\" argument must be a string");
+        string eventType = expr[1].as<string>();
+        return new EventTypeCondition(eventType);
+    }
+    else if(type == "handles")
+    {
+        if(expr.size() < 2)
+            throw std::runtime_error("\"handles\" requires one or more arguments");
+        vector<int> handles;
+        for(int i = 1; i < expr.size(); i++)
+        {
+            if(!expr[i].is_int64())
+                throw std::runtime_error("\"handles\" arguments must be int");
+            int handle = expr[i].as<int64_t>();
+            handles.push_back(handle);
+        }
+        return new HandlesCondition(handles);
+    }
+    else if(type == "uids")
+    {
+        if(expr.size() < 2)
+            throw std::runtime_error("\"uids\" requires one or more arguments");
+        vector<long long> uids;
+        for(int i = 1; i < expr.size(); i++)
+        {
+            if(!expr[i].is_int64())
+                throw std::runtime_error("\"uids\" arguments must be int");
+            long long uid = expr[i].as<int64_t>();
+            uids.push_back(uid);
+        }
+        return new UIDsCondition(uids);
+    }
+    else if(type == "has")
+    {
+        if(expr.size() < 2)
+            throw std::runtime_error("\"has\" requires exactly one argument");
+        if(!expr[1].is_string())
+            throw std::runtime_error("\"has\" argument must be a string");
+        string fieldName = expr[1].as<string>();
+        return new EventDataCondition(fieldName);
+    }
+    else if(type == "eq")
+    {
+        if(expr.size() < 2)
+            throw std::runtime_error("\"eq\" requires exactly two arguments");
+        if(!expr[1].is_string())
+            throw std::runtime_error("\"eq\" argument 1 must be a string");
+        string fieldName = expr[1].as<string>();
+        json fieldValue = expr[2];
+        return new EventDataCondition(fieldName, fieldValue);
+    }
+    else
+        throw std::runtime_error("invalid condition type: \"" + type + "\"");
+}
+
 struct Probe
 {
-    Probe(int scriptID, const string &callback)
+    Probe(int scriptID, const string &callback, const json &condition)
     {
         this->scriptID = scriptID;
         this->callback = callback;
+        this->condition = Condition::parse(condition);
     }
 
-    void setCondition(Condition *c)
+    virtual ~Probe()
     {
-        this->condition = c;
-    }
-
-    bool matches(const sim::EventInfo &info, const json &data)
-    {
-        if(!condition) return false;
-        return condition->matches(info, data);
-    }
-
-    void dispatch(const sim::EventInfo &info, const json &data)
-    {
-        int stack = sim::createStack();
-        json hdr = json::object();
-        hdr["event"] = info.event;
-        hdr["seq"] = info.seq;
-        hdr["uid"] = info.uid;
-        hdr["handle"] = info.handle;
-        hdr["data"] = data;
-        sim::pushValueOntoStack(stack, hdr);
-        sim::callScriptFunctionEx(scriptID, callback.c_str(), stack);
-        sim::releaseStack(stack);
+        delete condition;
     }
 
     void onEvent(const sim::EventInfo &info, const json &data)
     {
-        if(matches(info, data))
-            dispatch(info, data);
+        if(condition->matches(info, data))
+        {
+            int stack = sim::createStack();
+            json hdr = json::object();
+            hdr["event"] = info.event;
+            hdr["seq"] = info.seq;
+            hdr["uid"] = info.uid;
+            hdr["handle"] = info.handle;
+            hdr["data"] = data;
+            sim::pushValueOntoStack(stack, hdr);
+            sim::callScriptFunctionEx(scriptID, callback.c_str(), stack);
+            sim::releaseStack(stack);
+        }
     }
 
 private:
     string callback;
-    int scriptID {-1};
-    Condition *condition {nullptr};
+    int scriptID;
+    Condition *condition;
 };
 
 class Plugin : public sim::Plugin
@@ -225,8 +330,6 @@ public:
     {
         for(auto probe : probeHandles.find(scriptHandle))
             delete probeHandles.remove(probe);
-        for(auto condition : conditionHandles.find(scriptHandle))
-            delete conditionHandles.remove(condition);
     }
 
     void onEvent(const sim::EventInfo &info, const json &data) override
@@ -238,9 +341,9 @@ public:
 
     void addProbe(addProbe_in *in, addProbe_out *out)
     {
-        auto probe = new Probe(in->_.scriptID, in->callback);
-        if(in->conditionHandle.has_value())
-            probe->setCondition(conditionHandles.get(in->conditionHandle.value()));
+        json condition;
+        sim::getStackValue(in->_.stackID, &condition);
+        auto probe = new Probe(in->_.scriptID, in->callback, condition);
         out->probeHandle = probeHandles.add(probe, in->_.scriptID);
     }
 
@@ -250,84 +353,8 @@ public:
         delete probeHandles.remove(probe);
     }
 
-    void setProbeCondition(setProbeCondition_in *in, setProbeCondition_out *out)
-    {
-        auto probe = probeHandles.get(in->probeHandle);
-        auto condition = conditionHandles.get(in->conditionHandle);
-        probe->setCondition(condition);
-    }
-
-    void addAndCondition(addAndCondition_in *in, addAndCondition_out *out)
-    {
-        vector<Condition*> conditions;
-        for(const auto &conditionHandle : in->conditionHandles)
-            conditions.push_back(conditionHandles.get(conditionHandle));
-        auto condition = new AndCondition(conditions);
-        out->conditionHandle = conditionHandles.add(condition, in->_.scriptID);
-    }
-
-    void addOrCondition(addOrCondition_in *in, addOrCondition_out *out)
-    {
-        vector<Condition*> conditions;
-        for(const auto &conditionHandle : in->conditionHandles)
-            conditions.push_back(conditionHandles.get(conditionHandle));
-        auto condition = new OrCondition(conditions);
-        out->conditionHandle = conditionHandles.add(condition, in->_.scriptID);
-    }
-
-    void addNotCondition(addNotCondition_in *in, addNotCondition_out *out)
-    {
-        auto condition1 = conditionHandles.get(in->conditionHandle);
-        auto condition = new NotCondition(condition1);
-        out->conditionHandle = conditionHandles.add(condition, in->_.scriptID);
-    }
-
-    void addEventTypeCondition(addEventTypeCondition_in *in, addEventTypeCondition_out *out)
-    {
-        auto condition = new EventTypeCondition(in->eventType);
-        out->conditionHandle = conditionHandles.add(condition, in->_.scriptID);
-    }
-
-    void addHandlesCondition(addHandlesCondition_in *in, addHandlesCondition_out *out)
-    {
-        auto condition = new HandlesCondition(in->handles);
-        out->conditionHandle = conditionHandles.add(condition, in->_.scriptID);
-    }
-
-    void addUIDsCondition(addUIDsCondition_in *in, addUIDsCondition_out *out)
-    {
-        auto condition = new UIDsCondition(in->uids);
-        out->conditionHandle = conditionHandles.add(condition, in->_.scriptID);
-    }
-
-    void addEventDataCondition(addEventDataCondition_in *in, addEventDataCondition_out *out)
-    {
-        int sz = sim::getStackSize(in->_.stackID);
-        Condition *condition;
-        if(sz == 0)
-        {
-            condition = new EventDataCondition(in->fieldName);
-        }
-        else if(sz == 1)
-        {
-            json fieldValue;
-            sim::getStackValue(in->_.stackID, &fieldValue);
-            std::cout << "fieldValue=" << fieldValue << std::endl;
-            condition = new EventDataCondition(in->fieldName, fieldValue);
-        }
-        else throw std::runtime_error("too many arguments");
-        out->conditionHandle = conditionHandles.add(condition, in->_.scriptID);
-    }
-
-    void removeCondition(removeCondition_in *in, removeCondition_out *out)
-    {
-        auto condition = conditionHandles.get(in->conditionHandle);
-        delete conditionHandles.remove(condition);
-    }
-
 private:
     sim::Handles<Probe*> probeHandles{"simEvents.Probe"};
-    sim::Handles<Condition*> conditionHandles{"simEvents.Condition"};
 };
 
 SIM_PLUGIN(Plugin)
