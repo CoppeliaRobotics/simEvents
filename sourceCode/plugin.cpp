@@ -302,6 +302,12 @@ public:
         out->conditionHandle = conditionHandles.add(condition, in->_.scriptID);
     }
 
+    void removeCondition(removeCondition_in *in, removeCondition_out *out)
+    {
+        auto condition = conditionHandles.get(in->conditionHandle);
+        delete conditionHandles.remove(condition);
+    }
+
 private:
     sim::Handles<Probe*> probeHandles{"simEvents.Probe"};
     sim::Handles<Condition*> conditionHandles{"simEvents.Condition"};

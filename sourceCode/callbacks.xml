@@ -90,18 +90,10 @@
             <param name="conditionHandle" type="string" />
         </return>
     </command>
-    <struct name="probe_opts">
-        <param name="callback" type="string" nullable="true">
-            <description>Callback function to call when a matching event is received.</description>
-        </param>
-        <param name="eventTypes" type="table" item-type="string" nullable="true">
-            <description>Type of events to filter. Set to nil for all events.</description>
-        </param>
-        <param name="handles" type="table" item-type="int" nullable="true">
-            <description>Handles to filter. Set to nil for all events.</description>
-        </param>
-        <param name="properties" type="table" item-type="string" nullable="true">
-            <description>Properties to filter. Set to nil for all properties.</description>
-        </param>
-    </struct>
+    <command name="removeCondition">
+        <description>Remove a condition.</description>
+        <params>
+            <param name="conditionHandle" type="string" />
+        </params>
+    </command>
 </plugin>
