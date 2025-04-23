@@ -296,9 +296,20 @@ public:
 
     void addEventDataCondition(addEventDataCondition_in *in, addEventDataCondition_out *out)
     {
-        auto condition = in->fieldValue.has_value()
-            ? new EventDataCondition(in->fieldName, in->fieldValue)
-            : new EventDataCondition(in->fieldName);
+        int sz = sim::getStackSize(in->_.stackID);
+        Condition *condition;
+        if(sz == 0)
+        {
+            condition = new EventDataCondition(in->fieldName);
+        }
+        else if(sz == 1)
+        {
+            json fieldValue;
+            sim::getStackValue(in->_.stackID, &fieldValue);
+            std::cout << "fieldValue=" << fieldValue << std::endl;
+            condition = new EventDataCondition(in->fieldName, fieldValue);
+        }
+        else throw std::runtime_error("too many arguments");
         out->conditionHandle = conditionHandles.add(condition, in->_.scriptID);
     }
 

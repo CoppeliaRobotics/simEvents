@@ -84,7 +84,7 @@
         <description>Add a condition on the a field of the event data.</description>
         <params>
             <param name="fieldName" type="string" />
-            <param name="fieldValue" type="string" nullable="true" default="nil" />
+            <param name="fieldValue" skip="true" type="any" nullable="true" default="nil" />
         </params>
         <return>
             <param name="conditionHandle" type="string" />
