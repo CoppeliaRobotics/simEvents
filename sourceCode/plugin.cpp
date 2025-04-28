@@ -253,7 +253,7 @@ struct EventDataCondition : public Condition
     void dumpLua(std::ostream &os) const override
     {
         if(fieldValue.has_value())
-            os << "{'eq', '" << fieldName << "', " << fieldValue << "}";
+            os << "{'eq', '" << fieldName << "', " << fieldValue.value() << "}";
         else
             os << "{'has', '" << fieldName << "'}";
     }
