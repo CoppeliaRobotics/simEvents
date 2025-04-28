@@ -297,28 +297,34 @@ Condition * Condition::parse(const json &expr)
     }
     else if(type == "handles")
     {
-        if(expr.size() < 2)
-            throw std::runtime_error("\"handles\" requires one or more arguments");
+        if(expr.size() != 2)
+            throw std::runtime_error("\"handles\" requires exactly one argument");
+        const auto &arg = expr[1];
+        if(!arg.is_array())
+            throw std::runtime_error("\"handles\" argument must be an array");
         vector<int> handles;
-        for(int i = 1; i < expr.size(); i++)
+        for(int i = 0; i < arg.size(); i++)
         {
-            if(!expr[i].is_int64())
-                throw std::runtime_error("\"handles\" arguments must be int");
-            int handle = expr[i].as<int64_t>();
+            if(!arg[i].is_int64())
+                throw std::runtime_error("\"handles\" argument items must be int");
+            int handle = arg[i].as<int64_t>();
             handles.push_back(handle);
         }
         return new HandlesCondition(handles);
     }
     else if(type == "uids")
     {
-        if(expr.size() < 2)
-            throw std::runtime_error("\"uids\" requires one or more arguments");
+        if(expr.size() != 2)
+            throw std::runtime_error("\"uids\" requires exactly one argument");
+        const auto &arg = expr[1];
+        if(!arg.is_array())
+            throw std::runtime_error("\"uids\" argument must be an array");
         vector<long long> uids;
-        for(int i = 1; i < expr.size(); i++)
+        for(int i = 0; i < arg.size(); i++)
         {
-            if(!expr[i].is_int64())
-                throw std::runtime_error("\"uids\" arguments must be int");
-            long long uid = expr[i].as<int64_t>();
+            if(!arg[i].is_int64())
+                throw std::runtime_error("\"uids\" argument items must be int");
+            long long uid = arg[i].as<int64_t>();
             uids.push_back(uid);
         }
         return new UIDsCondition(uids);
