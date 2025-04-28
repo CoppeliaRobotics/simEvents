@@ -3,19 +3,19 @@ local simEvents = loadPlugin 'simEvents';
 
 simEvents.ChildObjectMonitor = {}
 
-function simEvents.ChildObjectMonitor:getChildren()
+function simEvents.ChildObjectMonitor:__getChildren()
     return sim.getObjectsInTree(self.__parentHandle, sim.handle_all, 3)
 end
 
-function simEvents.ChildObjectMonitor:removeEventProbe()
+function simEvents.ChildObjectMonitor:__removeEventProbe()
     if self.__probeHandle then
         simEvents.removeProbe(self.__probeHandle)
         self.__probeHandle = nil
     end
 end
 
-function simEvents.ChildObjectMonitor:setupEventProbe()
-    self:removeEventProbe()
+function simEvents.ChildObjectMonitor:__setupEventProbe()
+    self:__removeEventProbe()
 
     local conditions = {'or'}
 
@@ -29,7 +29,7 @@ function simEvents.ChildObjectMonitor:setupEventProbe()
         }
     )
 
-    local children = self:getChildren()
+    local children = self:__getChildren()
     table.insert(conditions,
         {'and',
             {'event', 'objectRemoved'},
@@ -48,17 +48,17 @@ function simEvents.ChildObjectMonitor:setupEventProbe()
     self.__probeHandle = simEvents.addProbe(
         reify(
             function(data)
-                self:triggerCallback()
-                self:setupEventProbe()
+                self:__triggerCallback()
+                self:__setupEventProbe()
             end
         ),
         conditions
     )
 end
 
-function simEvents.ChildObjectMonitor:triggerCallback()
+function simEvents.ChildObjectMonitor:__triggerCallback()
     if type(self.__callback) == 'function' then
-        self.__callback(self:getChildren())
+        self.__callback(self:__getChildren())
     end
 end
 
@@ -68,6 +68,10 @@ end
 
 setmetatable(
     simEvents.ChildObjectMonitor, {
+        --@fun ChildObjectMonitor create a child object monitor object
+        --@arg int parentHandle handle of the object to monitor
+        --@arg func callback function to be called when children of the object change
+        --@ret table object an instance of simEvents.ChildObjectMonitor
         __call = function(self, parentHandle, callback)
             local obj = setmetatable(
                 {
@@ -76,8 +80,8 @@ setmetatable(
                 },
                 self
             )
-            obj:setupEventProbe()
-            obj:triggerCallback()
+            obj:__setupEventProbe()
+            obj:__triggerCallback()
             return obj
         end,
     }
