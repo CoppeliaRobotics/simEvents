@@ -2,6 +2,7 @@
 #include <vector>
 #include <map>
 #include <optional>
+#include <functional>
 
 #include <simPlusPlus/Plugin.h>
 #include <simPlusPlus/Handles.h>
@@ -17,6 +18,7 @@ using std::string;
 using std::vector;
 using std::map;
 using std::optional;
+using std::function;
 using std::runtime_error;
 
 using json = jsoncons::json;
@@ -354,39 +356,29 @@ Condition * Condition::parse(const json &expr)
 
 struct Probe
 {
-    Probe(int scriptID, const string &callback, const json &condition)
+    Probe(const function<void(const json&)> &callback_, const Condition *condition_)
+        : callback(callback_), condition(condition_)
     {
-        this->scriptID = scriptID;
-        this->callback = callback;
-        this->condition = Condition::parse(condition);
-    }
-
-    virtual ~Probe()
-    {
-        delete condition;
     }
 
     void onEvent(const sim::EventInfo &info, const json &data)
     {
-        if(condition->matches(info, data))
+        if(condition && condition->matches(info, data))
         {
-            int stack = sim::createStack();
             json hdr = json::object();
             hdr["event"] = info.event;
             hdr["seq"] = info.seq;
             hdr["uid"] = info.uid;
             hdr["handle"] = info.handle;
             hdr["data"] = data;
-            sim::pushValueOntoStack(stack, hdr);
-            sim::callScriptFunctionEx(scriptID, callback.c_str(), stack);
-            sim::releaseStack(stack);
+            callback(hdr);
         }
     }
 
 private:
-    string callback;
-    int scriptID;
-    Condition *condition;
+    const function<void(const json&)> callback;
+    const Condition * const condition;
+    friend class Plugin;
 };
 
 class Plugin : public sim::Plugin
@@ -416,15 +408,31 @@ public:
 
     void addProbe(addProbe_in *in, addProbe_out *out)
     {
-        json condition;
-        sim::getStackValue(in->_.stackID, &condition);
-        auto probe = new Probe(in->_.scriptID, in->callback, condition);
+        json condition_json;
+        sim::getStackValue(in->_.stackID, &condition_json);
+        auto condition = Condition::parse(condition_json);
+
+        int scriptID = in->_.scriptID;
+        string callback = in->callback;
+
+        auto probe = new Probe(
+            [=] (const json &eventData)
+            {
+                int stack = sim::createStack();
+                sim::pushValueOntoStack(stack, eventData);
+                sim::callScriptFunctionEx(scriptID, callback.c_str(), stack);
+                sim::releaseStack(stack);
+            },
+            condition
+        );
+
         out->probeHandle = probeHandles.add(probe, in->_.scriptID);
     }
 
     void removeProbe(removeProbe_in *in, removeProbe_out *out)
     {
         auto probe = probeHandles.get(in->probeHandle);
+        delete probe->condition;
         delete probeHandles.remove(probe);
     }
 
