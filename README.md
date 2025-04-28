@@ -2,7 +2,22 @@
 
 A plugin to filter events.
 
-Usage:
+Usage: call `simEvents.addProbe(callback, condition)` to setup an event probe.
+
+Condition can be one of:
+
+| Condition   | Description |
+| ----------- | ----------- |
+| `{'and', cond-1, cond-2, ...}` | Boolean "and" of the nested conditions |
+| `{'or',  cond-1, cond-2, ...}` | Boolean "or" of the nested conditions |
+| `{'not', cond-1}` | Boolean "not" of the nested condition |
+| `{'event', eventType}` | Filter on event type (e.g. objectAdded, objectChanged, etc...) |
+| `{'handles', {handle-1, ...}}` | Filter on handle field |
+| `{'uids', {uid-1, ...}}` | Filter on handle field |
+| `{'has', fieldName}` | Filter on the presence of the specified field |
+| `{'eq', fieldName, fieldValue}` | Filter on the value of the specified field |
+
+Example:
 
 ```lua
 sim = require 'sim'
@@ -18,7 +33,7 @@ function sysCall_init()
         {'event', 'objectChanged'},
         {'handles', {dummy}},
         {'or',
-            {'has', 'collapsed'},     -- filter on field presence
+            {'has', 'collapsed'},      -- filter on field presence
             {'eq',  'selected', true}, -- filter on field value
         },
     })
