@@ -17,6 +17,10 @@ Condition can be one of:
 | `{'has', fieldName}` | Filter on the presence of the specified field |
 | `{'eq', fieldName, fieldValue}` | Filter on the value of the specified field |
 
+Use `simEvents.removeProbe(probeHandle)` to later remove the probe and stop monitoring those events.
+
+Note: to monitor the direct children of an object, use `simEvents.addChildrenMonitor(callback, handle)`, which provides a self-modifying event probe that simplifies the handles bookkeeping.
+
 Example:
 
 ```lua
