@@ -263,6 +263,33 @@ private:
     const optional<json> fieldValue;
 };
 
+struct ChildrenMonitorCondition : public Condition
+{
+    ChildrenMonitorCondition(int parentHandle_, const vector<int> &children_)
+        : parentHandle(parentHandle_), children(children_)
+    {
+    }
+
+    bool matches(const sim::EventInfo &info, const json &data) const override
+    {
+        bool matchHandle = std::find(children.begin(), children.end(), info.handle) != children.end();
+        bool hasParentHandle = data.contains("parentHandle");
+        bool matchParentHandle = hasParentHandle ? (data["parentHandle"].as<int>() == parentHandle) : false;
+        return ((info.event == "objectAdded" || info.event == "objectChanged") && matchParentHandle)
+            || (info.event == "objectRemoved" && matchHandle)
+            || (info.event == "objectChanged" && matchHandle && hasParentHandle);
+    }
+
+    void dumpLua(std::ostream &os) const override
+    {
+        os << "ChildrenMonitorCondition(" << parentHandle << ")";
+    }
+
+private:
+    int parentHandle;
+    vector<int> children;
+};
+
 Condition * Condition::parse(const json &expr)
 {
     if(!expr.is_array() || expr.size() < 1 || !expr[0].is_string())
@@ -439,40 +466,6 @@ public:
     void addChildrenMonitor(addChildrenMonitor_in *in, addChildrenMonitor_out *out)
     {
         int parentHandle = in->parentHandle;
-
-        auto childrenMonitorCondition = [parentHandle] ()
-        {
-            vector<int> children = sim::getObjectsInTree(parentHandle, sim_handle_all, 3);
-            return new OrCondition(
-                {
-                    new AndCondition(
-                        {
-                            new OrCondition(
-                                {
-                                    new EventTypeCondition("objectAdded"),
-                                    new EventTypeCondition("objectChanged"),
-                                }
-                            ),
-                            new EventDataCondition("parentHandle", parentHandle),
-                        }
-                    ),
-                    new AndCondition(
-                        {
-                            new EventTypeCondition("objectRemoved"),
-                            new HandlesCondition(children),
-                        }
-                    ),
-                    new AndCondition(
-                        {
-                            new EventTypeCondition("objectChanged"),
-                            new HandlesCondition(children),
-                            new EventDataCondition("parentHandle"),
-                        }
-                    ),
-                }
-            );
-        };
-
         int scriptID = in->_.scriptID;
         string callback = in->callback;
 
@@ -485,14 +478,16 @@ public:
             childrenMonitorCallback(scriptID, callback.c_str(), &in, &out);
         };
 
-        auto childrenChangedCallback = [childrenMonitorCondition, notifyChildrenChanged] (Probe *probe, const json &eventData)
+        auto childrenChangedCallback = [parentHandle, notifyChildrenChanged] (Probe *probe, const json &eventData)
         {
             delete probe->condition;
-            probe->condition = childrenMonitorCondition();
+            vector<int> children = sim::getObjectsInTree(parentHandle, sim_handle_all, 3);
+            probe->condition = new ChildrenMonitorCondition(parentHandle, children);
             notifyChildrenChanged();
         };
 
-        auto probe = new Probe(childrenChangedCallback, childrenMonitorCondition());
+        vector<int> children = sim::getObjectsInTree(parentHandle, sim_handle_all, 3);
+        auto probe = new Probe(childrenChangedCallback, new ChildrenMonitorCondition(parentHandle, children));
 
         // XXX: calling notifyChildrenChanged() here is also required to let
         //      scripts properly react to undo:
