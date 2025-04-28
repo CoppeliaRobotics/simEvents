@@ -356,7 +356,7 @@ Condition * Condition::parse(const json &expr)
 
 struct Probe
 {
-    Probe(const function<void(const json&)> &callback_, const Condition *condition_)
+    Probe(const function<void(Probe *probe, const json&)> &callback_, const Condition *condition_)
         : callback(callback_), condition(condition_)
     {
     }
@@ -371,13 +371,13 @@ struct Probe
             hdr["uid"] = info.uid;
             hdr["handle"] = info.handle;
             hdr["data"] = data;
-            callback(hdr);
+            callback(this, hdr);
         }
     }
 
 private:
-    const function<void(const json&)> callback;
-    const Condition * const condition;
+    function<void(Probe *probe, const json&)> callback;
+    const Condition * condition;
     friend class Plugin;
 };
 
@@ -416,7 +416,7 @@ public:
         string callback = in->callback;
 
         auto probe = new Probe(
-            [=] (const json &eventData)
+            [=] (Probe *probe, const json &eventData)
             {
                 int stack = sim::createStack();
                 sim::pushValueOntoStack(stack, eventData);
@@ -434,6 +434,71 @@ public:
         auto probe = probeHandles.get(in->probeHandle);
         delete probe->condition;
         delete probeHandles.remove(probe);
+    }
+
+    void addChildrenMonitor(addChildrenMonitor_in *in, addChildrenMonitor_out *out)
+    {
+        int parentHandle = in->parentHandle;
+
+        auto childrenMonitorCondition = [parentHandle] ()
+        {
+            vector<int> children = sim::getObjectsInTree(parentHandle, sim_handle_all, 3);
+            return new OrCondition(
+                {
+                    new AndCondition(
+                        {
+                            new OrCondition(
+                                {
+                                    new EventTypeCondition("objectAdded"),
+                                    new EventTypeCondition("objectChanged"),
+                                }
+                            ),
+                            new EventDataCondition("parentHandle", parentHandle),
+                        }
+                    ),
+                    new AndCondition(
+                        {
+                            new EventTypeCondition("objectRemoved"),
+                            new HandlesCondition(children),
+                        }
+                    ),
+                    new AndCondition(
+                        {
+                            new EventTypeCondition("objectChanged"),
+                            new HandlesCondition(children),
+                            new EventDataCondition("parentHandle"),
+                        }
+                    ),
+                }
+            );
+        };
+
+        int scriptID = in->_.scriptID;
+        string callback = in->callback;
+
+        auto notifyChildrenChanged = [parentHandle, scriptID, callback] ()
+        {
+            vector<int> children = sim::getObjectsInTree(parentHandle, sim_handle_all, 3);
+            childrenMonitorCallback_in in;
+            in.childrenHandles = children;
+            childrenMonitorCallback_out out;
+            childrenMonitorCallback(scriptID, callback.c_str(), &in, &out);
+        };
+
+        auto childrenChangedCallback = [childrenMonitorCondition, notifyChildrenChanged] (Probe *probe, const json &eventData)
+        {
+            delete probe->condition;
+            probe->condition = childrenMonitorCondition();
+            notifyChildrenChanged();
+        };
+
+        auto probe = new Probe(childrenChangedCallback, childrenMonitorCondition());
+
+        // XXX: calling notifyChildrenChanged() here is also required to let
+        //      scripts properly react to undo:
+        notifyChildrenChanged();
+
+        out->probeHandle = probeHandles.add(probe, in->_.scriptID);
     }
 
 private:

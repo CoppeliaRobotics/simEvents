@@ -6,17 +6,50 @@
     <command name="addProbe">
         <description>Add a event probe.</description>
         <params>
-            <param name="callback" type="string" />
-            <param name="condition" skip="true" type="any" />
+            <param name="callback" type="string">
+                <description>Callback function to call when an event matches the given condition. Arguments are (eventData).</description>
+            </param>
+            <param name="condition" skip="true" type="any">
+                <description>Boolean condition (see README).</description>
+            </param>
         </params>
         <return>
-            <param name="probeHandle" type="string" />
+            <param name="probeHandle" type="string">
+                <description>Handle to the newly created probe object.</description>
+            </param>
         </return>
     </command>
     <command name="removeProbe">
         <description>Remove a previously created event probe.</description>
         <params>
-            <param name="probeHandle" type="string" />
+            <param name="probeHandle" type="string">
+                <description>Handle to the probe object.</description>
+            </param>
         </params>
     </command>
+    <command name="addChildrenMonitor">
+        <description>Add a children monitor probe to monitor changes in the (direct) children of a scene object.</description>
+        <params>
+            <param name="parentHandle" type="int">
+                <description>Handle to the scene object.</description>
+            </param>
+            <param name="callback" type="string">
+                <description>Callback function to call when children of the scene object change. Arguments are (childrenHandles).</description>
+            </param>
+        </params>
+        <return>
+            <param name="probeHandle" type="string">
+            </param>
+        </return>
+    </command>
+    <script-function name="childrenMonitorCallback">
+        <description>Callback called when children of an object change, used by <command-ref name="addChildrenMonitor" />.</description>
+        <params>
+            <param name="childrenHandles" type="table" item-type="int">
+                <description>handles of the children objects</description>
+            </param>
+        </params>
+        <return>
+        </return>
+    </script-function>
 </plugin>
