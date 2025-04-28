@@ -27,6 +27,8 @@ struct Condition
     virtual ~Condition() {}
     virtual bool matches(const sim::EventInfo &info, const json &data) const = 0;
 
+    virtual void dumpLua(std::ostream &os) const = 0;
+
     static Condition * parse(const json &expr);
 
 private:
@@ -60,6 +62,17 @@ struct AndCondition : public Condition
         return true;
     }
 
+    void dumpLua(std::ostream &os) const override
+    {
+        os << "{'and'";
+        for(const auto condition : conditions)
+        {
+            os << ", ";
+            condition->dumpLua(os);
+        }
+        os << "}";
+    }
+
 private:
     const vector<Condition*> conditions;
 };
@@ -85,6 +98,17 @@ struct OrCondition : public Condition
         return false;
     }
 
+    void dumpLua(std::ostream &os) const override
+    {
+        os << "{'or'";
+        for(const auto condition : conditions)
+        {
+            os << ", ";
+            condition->dumpLua(os);
+        }
+        os << "}";
+    }
+
 private:
     const vector<Condition*> conditions;
 };
@@ -106,6 +130,13 @@ struct NotCondition : public Condition
         return !condition->matches(info, data);
     }
 
+    void dumpLua(std::ostream &os) const override
+    {
+        os << "{'not', ";
+        condition->dumpLua(os);
+        os << "}";
+    }
+
 private:
     const Condition *condition;
 };
@@ -120,6 +151,11 @@ struct EventTypeCondition : public Condition
     bool matches(const sim::EventInfo &info, const json &data) const override
     {
         return info.event == eventType;
+    }
+
+    void dumpLua(std::ostream &os) const override
+    {
+        os << "{'event', '" << eventType << "'}";
     }
 
 private:
@@ -141,6 +177,18 @@ struct HandlesCondition : public Condition
         return false;
     }
 
+    void dumpLua(std::ostream &os) const override
+    {
+        os << "{'handles', {";
+        string sep = "";
+        for(int handle : handles)
+        {
+            os << sep << handle;
+            sep = ", ";
+        }
+        os << "}}";
+    }
+
 private:
     const vector<int> handles;
 };
@@ -158,6 +206,19 @@ struct UIDsCondition : public Condition
             if(info.uid == uid)
                 return true;
         return false;
+    }
+
+    void dumpLua(std::ostream &os) const override
+    {
+        os << "{'uids', {";
+        string sep = "";
+        for(int uid : uids)
+        {
+            os << sep << uid;
+            sep = ", ";
+        }
+        os << "}}";
+
     }
 
 private:
@@ -185,6 +246,14 @@ struct EventDataCondition : public Condition
             return true;
 
         return data[fieldName] == fieldValue.value();
+    }
+
+    void dumpLua(std::ostream &os) const override
+    {
+        if(fieldValue.has_value())
+            os << "{'eq', '" << fieldName << "', " << fieldValue << "}";
+        else
+            os << "{'has', '" << fieldName << "'}";
     }
 
 private:
