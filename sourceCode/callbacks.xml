@@ -30,11 +30,11 @@
     <command name="addChildrenMonitor">
         <description>Add a children monitor probe to monitor changes in the (direct) children of a scene object.</description>
         <params>
-            <param name="parentHandle" type="int">
-                <description>Handle to the scene object.</description>
-            </param>
             <param name="callback" type="string">
                 <description>Callback function to call when children of the scene object change. Arguments are (childrenHandles).</description>
+            </param>
+            <param name="parentHandle" type="int">
+                <description>Handle to the scene object.</description>
             </param>
         </params>
         <return>
