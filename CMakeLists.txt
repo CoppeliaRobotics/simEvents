@@ -36,4 +36,19 @@ coppeliasim_generate_stubs(${CMAKE_CURRENT_BINARY_DIR}/generated XML_FILE ${CMAK
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/sourceCode/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
-coppeliasim_add_plugin(simEvents SOURCES sourceCode/plugin.cpp)
+coppeliasim_add_plugin(simEvents
+    SOURCES
+    sourceCode/plugin.cpp
+    sourceCode/probe.cpp
+    sourceCode/conditions/condition.cpp
+    sourceCode/conditions/and.cpp
+    sourceCode/conditions/or.cpp
+    sourceCode/conditions/not.cpp
+    sourceCode/conditions/event.cpp
+    sourceCode/conditions/handles.cpp
+    sourceCode/conditions/uids.cpp
+    sourceCode/conditions/has.cpp
+    sourceCode/conditions/eq.cpp
+    sourceCode/conditions/parser.cpp
+    sourceCode/conditions/childrenMonitor.cpp
+)
