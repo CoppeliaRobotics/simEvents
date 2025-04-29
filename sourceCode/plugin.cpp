@@ -34,7 +34,12 @@ public:
     void onScriptStateAboutToBeDestroyed(int scriptHandle, long long scriptUid) override
     {
         for(auto probe : probeHandles.find(scriptHandle))
-            delete probeHandles.remove(probe);
+        {
+            removeProbe_in in;
+            in.probeHandle = probeHandles.toHandle(probe);
+            removeProbe_out out;
+            removeProbe(&in, &out);
+        }
     }
 
     void onEvent(const sim::EventInfo &info, const json &data) override
