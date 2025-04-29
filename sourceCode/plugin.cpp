@@ -34,19 +34,20 @@ public:
     void onScriptStateAboutToBeDestroyed(int scriptHandle, long long scriptUid) override
     {
         for(auto probe : probeHandles.find(scriptHandle))
-        {
-            removeProbe_in in;
-            in.probeHandle = probeHandles.toHandle(probe);
-            removeProbe_out out;
-            removeProbe(&in, &out);
-        }
+            removeProbe(probe);
     }
 
     void onEvent(const sim::EventInfo &info, const json &data) override
     {
+        forbidProbeDelete = true;
         int sceneID = sim::getInt32Param(sim_intparam_scene_unique_id);;
         for(const auto &probe : probeHandles.findByScene(sceneID))
             probe->onEvent(info, data);
+        forbidProbeDelete = false;
+
+        for(auto probe : deleteLaterProbes)
+            removeProbe(probe);
+        deleteLaterProbes.clear();
     }
 
     void addProbe(addProbe_in *in, addProbe_out *out)
@@ -72,11 +73,24 @@ public:
         out->probeHandle = probeHandles.add(probe, in->_.scriptID);
     }
 
+    void removeProbe(Probe *probe)
+    {
+        // XXX: a probe callback (called from Plugin::onEvent) could delete another probe
+        //      in that case we delay the removal, otherwise we get a crash (dangling pointer)
+        if(forbidProbeDelete)
+        {
+            deleteLaterProbes.push_back(probe);
+            return;
+        }
+
+        delete probe->setCondition(nullptr);
+        delete probeHandles.remove(probe);
+    }
+
     void removeProbe(removeProbe_in *in, removeProbe_out *out)
     {
         auto probe = probeHandles.get(in->probeHandle);
-        delete probe->setCondition(nullptr);
-        delete probeHandles.remove(probe);
+        removeProbe(probe);
     }
 
     void addChildrenMonitor(addChildrenMonitor_in *in, addChildrenMonitor_out *out)
@@ -113,6 +127,8 @@ public:
 
 private:
     sim::Handles<Probe*> probeHandles{"simEvents.Probe"};
+    bool forbidProbeDelete {false};
+    std::vector<Probe*> deleteLaterProbes;
 };
 
 SIM_PLUGIN(Plugin)
