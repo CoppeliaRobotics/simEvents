@@ -1,5 +1,7 @@
 # Events plugin for CoppeliaSim
 
+[//]: # (plugin_doc_begin)
+
 A plugin to filter events.
 
 Usage: call `simEvents.addProbe(callback, condition)` to setup an event probe.
@@ -43,6 +45,8 @@ function sysCall_init()
     })
 end
 ```
+
+[//]: # (plugin_doc_end)
 
 ### Compiling
 
