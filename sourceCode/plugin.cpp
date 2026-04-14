@@ -1,8 +1,8 @@
 #include <string>
 #include <vector>
 
-#include <simPlusPlus/Plugin.h>
-#include <simPlusPlus/Handles.h>
+#include <simPlusPlus-2/Plugin.h>
+#include <simPlusPlus-2/Handles.h>
 
 #include <jsoncons/json.hpp>
 
