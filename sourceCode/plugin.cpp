@@ -40,7 +40,7 @@ public:
     void onEvent(const sim::EventInfo &info, const json &data) override
     {
         forbidProbeDelete = true;
-        int sceneID = sim::getIntProperty(sim_handle_scene, "sceneUid");
+        int sceneID = sim::getIntProperty(sim_handle_scene, "uid");
         for(const auto &probe : probeHandles.findByScene(sceneID))
             probe->onEvent(info, data);
         forbidProbeDelete = false;
