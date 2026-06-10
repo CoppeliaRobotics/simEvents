@@ -26,9 +26,6 @@ public:
     {
         if(!registerScriptStuff())
             throw runtime_error("failed to register script stuff");
-
-        setExtVersion("Events Plugin");
-        setBuildDate(BUILD_DATE);
     }
 
     void onScriptStateAboutToBeDestroyed(int scriptHandle, long long scriptUid) override
