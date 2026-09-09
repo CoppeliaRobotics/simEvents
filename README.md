@@ -26,7 +26,7 @@ Note: to monitor the direct children of an object, use `simEvents.addChildrenMon
 Example:
 
 ```lua
-sim = require 'sim'
+sim = require 'sim-1'
 simEvents = require 'simEvents'
 
 function callback(data)
