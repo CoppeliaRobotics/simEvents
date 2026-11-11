@@ -26,7 +26,6 @@ FetchContent_Declare(jsoncons
 )
 set(JSONCONS_BUILD_TESTS OFF CACHE BOOL "Build jsoncons tests")
 FetchContent_MakeAvailable(jsoncons)
-set_property(TARGET jsoncons PROPERTY EXCLUDE_FROM_ALL TRUE)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/generated)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/jsoncons/include)
